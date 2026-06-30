@@ -83,8 +83,8 @@
     </div>`;
 
   const pg = D.priceGroups || [];
-  const leftCats = pg.filter(cat => ["作曲", "其他"].includes(cat.category));
-  const rightCats = pg.filter(cat => !["作曲", "其他"].includes(cat.category));
+  const leftCats = pg.filter(cat => cat.category === "作曲");
+  const rightCats = pg.filter(cat => cat.category !== "作曲");
   $("priceGroups").innerHTML =
     `<div class="price-col">${leftCats.map(renderCat).join("")}</div>` +
     `<div class="price-col">${rightCats.map(renderCat).join("")}</div>`;
