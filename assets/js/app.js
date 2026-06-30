@@ -96,17 +96,20 @@
 
   /* ---------- 排单 ---------- */
   const qMeta = { doing: "进行中", queued: "排队中", done: "已完成" };
-  $("queueList").innerHTML = (D.queue || []).map(q => `
-    <div class="queue-item">
-      <div class="queue-item__main">
-        <div class="queue-item__title">${esc(q.title)}</div>
-        <div class="bar"><div class="bar__fill" style="width:${Number(q.progress) || 0}%"></div></div>
-      </div>
-      <div class="queue-item__meta">
-        <span class="qstatus qstatus--${q.status}">${qMeta[q.status] || q.status}</span><br/>
-        ${q.ddl ? "截稿 " + esc(q.ddl) : ""}
-      </div>
-    </div>`).join("") || `<p class="empty">暂无排单</p>`;
+  const queueList = $("queueList");
+  if (queueList) {
+    queueList.innerHTML = (D.queue || []).map(q => `
+      <div class="queue-item">
+        <div class="queue-item__main">
+          <div class="queue-item__title">${esc(q.title)}</div>
+          <div class="bar"><div class="bar__fill" style="width:${Number(q.progress) || 0}%"></div></div>
+        </div>
+        <div class="queue-item__meta">
+          <span class="qstatus qstatus--${q.status}">${qMeta[q.status] || q.status}</span><br/>
+          ${q.ddl ? "截稿 " + esc(q.ddl) : ""}
+        </div>
+      </div>`).join("") || `<p class="empty">暂无排单</p>`;
+  }
 
   /* ---------- 作品播放器：自定义黑胶 + 真同步歌词 ---------- */
   const TRACKS = window.TRACKS || {};
@@ -151,7 +154,7 @@
         </div>
         ${lyrics}
       </div>
-      <div class="p2-bar"><div class="p2-fill"></div></div>
+      <div class="p2-bar"><div class="p2-fill"></div><span class="p2-thumb" aria-hidden="true"></span></div>
       <audio class="p2-audio" preload="none" src="${neOuter(w.netease)}"></audio>`;
   }
   function workPlayer(w) {
@@ -187,6 +190,7 @@
       const panel = stage.querySelector(".lyrics");
       const fill = root.querySelector(".p2-fill");
       const bar = root.querySelector(".p2-bar");
+      const thumb = root.querySelector(".p2-thumb");
       const btn = stage.querySelector(".vinyl__btn");
       const vinyl = stage.querySelector(".vinyl");
       const card = stage.closest(".work-card");
@@ -221,8 +225,14 @@
       });
 
       let last = -1;
+      const updateProgress = (percent) => {
+        const value = Math.max(0, Math.min(100, percent));
+        if (fill) fill.style.width = value + "%";
+        if (thumb) thumb.style.left = value + "%";
+      };
+
       audio.addEventListener("timeupdate", () => {
-        if (fill && audio.duration) fill.style.width = (audio.currentTime / audio.duration * 100) + "%";
+        if (audio.duration) updateProgress(audio.currentTime / audio.duration * 100);
         const ct = audio.currentTime + 0.2;
         let idx = -1;
         for (let i = 0; i < times.length; i++) { if (times[i] <= ct) idx = i; }
@@ -235,10 +245,30 @@
           }
         }
       });
-      if (bar) bar.addEventListener("click", (e) => {
-        const r = bar.getBoundingClientRect();
-        if (audio.duration) audio.currentTime = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * audio.duration;
-      });
+      if (bar) {
+        const seekTo = (clientX) => {
+          const r = bar.getBoundingClientRect();
+          if (!audio.duration || !r.width) return;
+          const percent = Math.max(0, Math.min(1, (clientX - r.left) / r.width));
+          audio.currentTime = percent * audio.duration;
+          updateProgress(percent * 100);
+        };
+        bar.addEventListener("pointerdown", (e) => {
+          e.preventDefault();
+          bar.setPointerCapture?.(e.pointerId);
+          seekTo(e.clientX);
+        });
+        bar.addEventListener("pointermove", (e) => {
+          if (e.buttons !== 1 && e.pointerType !== "touch") return;
+          seekTo(e.clientX);
+        });
+        bar.addEventListener("pointerup", (e) => {
+          bar.releasePointerCapture?.(e.pointerId);
+        });
+        bar.addEventListener("pointercancel", (e) => {
+          bar.releasePointerCapture?.(e.pointerId);
+        });
+      }
     });
   }
 
